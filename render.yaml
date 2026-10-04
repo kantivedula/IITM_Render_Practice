@@ -1,0 +1,37 @@
+services:
+  - type: web
+    name: living-knowledge-emily
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn agent:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    disk:
+      name: emily-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: LANGSMITH_TRACING
+        value: "false"
+      - key: LANGSMITH_API_KEY
+        sync: false
+      - key: LANGSMITH_PROJECT
+        value: living-knowledge-emily
+      - key: LIVING_KNOWLEDGE_WEBSITE
+        value: https://www.livingknowledge.in
+      - key: EMILY_DATABASE_PATH
+        value: /var/data/emily.sqlite3
+      - key: NGROK_ENABLED
+        value: "false"
+      - key: MS_TENANT_ID
+        sync: false
+      - key: MS_CLIENT_ID
+        sync: false
+      - key: MS_CLIENT_SECRET
+        sync: false
+      - key: ONEDRIVE_DRIVE_ID
+        sync: false
+      - key: ONEDRIVE_FOLDER_PATH
+        sync: false
