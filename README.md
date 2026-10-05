@@ -8,7 +8,8 @@ flow.
 ## Requirements
 
 - Python 3.10 or newer
-- A Google AI API key with access to `gemini-2.5-flash-lite`
+- A Google AI API key with access to the configured `GOOGLE_MODEL`
+- Google Search grounding enabled for the associated Gemini API project
 - Optional LangSmith account/API key for tracing
 - Optional Microsoft Entra application and approved OneDrive folder for private
   knowledge
@@ -38,10 +39,15 @@ Open <http://127.0.0.1:8000>. The API docs are at
 <http://127.0.0.1:8000/docs> and the health endpoint is
 <http://127.0.0.1:8000/health>.
 
-The web chat asks for an enquiry, then **Prepare initial proposal** creates a
-draft using the collected details and configured knowledge. The proposal opens
-in a preview page. Its **Accept this draft and enable download** button enables
-an HTML download.
+The web chat asks for an enquiry, then **Generate proposal** searches supported
+documents under the configured OneDrive folder, selects relevant training
+content, performs Google Search grounding for the training topic, and drafts a
+proposal from those sources and the enquiry. The preview displays the grounded
+answer with its citations and Search suggestions in a separate section.
+**Accept this draft and enable download** enables an HTML download. Proposal
+generation requires a readable OneDrive folder with relevant documents and
+Google Search grounding to return cited results; otherwise the page shows an
+actionable error.
 
 ## Endpoints
 
@@ -63,20 +69,24 @@ configured tunnel username and password. The app still has no individual
 accounts, rate limiting, or production data controls; do not use it for real
 enquiries until these are added.
 
-## Optional OneDrive knowledge
+## OneDrive proposal knowledge
 
 Create a Microsoft Entra app registration with Microsoft Graph **application**
 permission to read only the intended knowledge location, grant admin consent,
 and set `MS_TENANT_ID`, `MS_CLIENT_ID`, and `MS_CLIENT_SECRET`. Set
 `ONEDRIVE_DRIVE_ID` and `ONEDRIVE_FOLDER_PATH` to the approved drive and folder.
-Emily reads supported `.txt`, `.md`, `.docx`, and `.pdf` files directly inside
-that folder (not subfolders), with a 2 MB per-file limit. If those settings are
-blank, only the public website is used.
+Configure all five values in Render's Environment settings. If one or more are
+missing, the proposal action now returns a clear configuration error. Emily
+searches supported `.txt`, `.md`, `.docx`, and `.pdf` files in that folder and
+its subfolders (up to 40 documents, 20 folders, and 2 MB per file), then selects
+text matching the training topic. Files with names indicating proposals,
+quotations, pricing, or financial material are excluded, and contact details
+and explicitly sensitive lines are redacted.
 
-Only place material approved for proposal drafting in this folder. The app
-skips documents whose filenames look like client, case-study, proposal, quote,
-pricing, or commercial records, and filters lines that appear sensitive; these
-are safeguards, not a substitute for curating the folder or access permissions.
+Use a dedicated folder containing only material approved for proposal drafting.
+Do not connect a folder containing other clients' confidential records: the
+application has no per-client authentication or OneDrive permission isolation,
+and text redaction is not a security boundary.
 
 ## LangSmith
 
@@ -93,6 +103,31 @@ Conversation inputs can contain personal information, so review your
 organization's privacy requirements and LangSmith data-retention settings
 before enabling tracing for real enquiries. Disable tracing with
 `LANGSMITH_TRACING=false` when appropriate.
+
+## Google Search grounding
+
+Emily can use Gemini's built-in Google Search grounding to answer in-scope
+questions that ask for current or independently verifiable training/OD facts,
+research, trends, or examples. The model first creates a short generic search
+topic that omits names, organizations, and contact details. Search-grounded
+answers display their Google-provided citations and Search suggestions in the
+chat. Proposals also use a generic training-topic query for Google Search
+grounding after OneDrive retrieval; queries are assembled from training
+categories and skills rather than requester names, organizations, or contact
+details. The proposal preview and download display
+the grounded answer, Google-provided citations, and Search suggestions in a
+separate section; the generated proposal content itself does not name its
+sources. Gemini's Google Search grounding requires its citations and Search
+suggestions to be shown to the user.
+
+Set `GOOGLE_SEARCH_ENABLED=false` to turn this feature off. It is enabled in
+`.env.example` and the Render Blueprint. Google Search grounding availability,
+quota, and any charges depend on the Gemini API project and model. Google
+retains prompts, context, and outputs used for grounding for 30 days under its
+Gemini API terms; avoid putting personal or confidential information into
+search topics. Review these terms and your data-handling requirements before
+enabling it for public users. LangSmith tracing may also capture model
+interactions, so review tracing privacy settings separately.
 
 ## ngrok tunnel
 
@@ -155,7 +190,9 @@ rate limiting, or hardened data handling.
 ## Deploy to Render
 
 This repository includes a `render.yaml` Blueprint for deploying Emily directly
-to Render; ngrok is disabled in that deployment. In Render, create a new
+to Render; the app detects Render's `RENDER=true` environment variable and
+disables ngrok there even if `NGROK_ENABLED=true` is set accidentally. The
+Blueprint also sets `NGROK_ENABLED=false`. In Render, create a new
 Blueprint instance from the repository and set the prompted `GOOGLE_API_KEY`
 secret. Optionally set LangSmith keys and configure **all five** Microsoft
 Graph/OneDrive values if using that integration. Leave all OneDrive values

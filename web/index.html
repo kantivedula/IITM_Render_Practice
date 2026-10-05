@@ -16,6 +16,9 @@
     .message { max-width: 85%; padding: 11px 14px; margin: 10px 0; border-radius: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
     .assistant { background: #edf5f1; }
     .user { background: #17594c; color: white; margin-left: auto; }
+    .citations { max-width: 85%; margin: -4px 0 12px 10px; font-size: .84rem; }
+    .citations a { color: #17594c; }
+    .suggestions { display: block; width: min(600px, 100%); height: 120px; border: 0; margin: 4px 0 16px; }
     .error { color: #9a2828; padding: 0 22px; }
     form { border-top: 1px solid #e3eae6; padding: 16px; display: flex; gap: 10px; }
     input { min-width: 0; flex: 1; padding: 12px; border: 1px solid #cbd8d1; border-radius: 8px; font: inherit; }
@@ -42,7 +45,7 @@
       <button id="send" type="submit">Send</button>
     </form>
     <div class="actions">
-      <button id="makeProposal" type="button">Prepare initial proposal</button>
+      <button id="makeProposal" type="button">Generate proposal</button>
       <span id="proposalStatus" role="status"></span>
     </div>
     <p class="privacy">Please share only information needed to discuss your training enquiry. This prototype stores conversation details locally in its SQLite database.</p>
@@ -59,6 +62,36 @@
       item.className = `message ${who}`;
       item.textContent = text;
       messages.appendChild(item);
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    function addGroundedDetails(citations, suggestionsHtml) {
+      if (citations && citations.length) {
+        const list = document.createElement("div");
+        list.className = "citations";
+        const label = document.createElement("span");
+        label.textContent = "Sources: ";
+        list.appendChild(label);
+        citations.forEach((citation, index) => {
+          if (index) list.append(" · ");
+          const link = document.createElement("a");
+          link.textContent = citation.cited_text || citation.title;
+          link.title = citation.title;
+          link.href = citation.url;
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+          list.appendChild(link);
+        });
+        messages.appendChild(list);
+      }
+      if (suggestionsHtml) {
+        const suggestions = document.createElement("iframe");
+        suggestions.className = "suggestions";
+        suggestions.title = "Google Search suggestions";
+        suggestions.setAttribute("sandbox", "allow-popups allow-popups-to-escape-sandbox");
+        suggestions.srcdoc = suggestionsHtml;
+        messages.appendChild(suggestions);
+      }
       messages.scrollTop = messages.scrollHeight;
     }
 
@@ -81,6 +114,7 @@
         sessionId = data.session_id;
         localStorage.setItem("emily-session-id", sessionId);
         addMessage(data.reply, "assistant");
+        addGroundedDetails(data.citations, data.search_suggestions_html);
       } catch (err) {
         error.textContent = err.message;
       } finally {
@@ -93,7 +127,12 @@
       const status = document.getElementById("proposalStatus");
       const button = document.getElementById("makeProposal");
       error.textContent = "";
-      status.textContent = "Preparing your draft…";
+      if (!sessionId) {
+        status.textContent = "";
+        error.textContent = "Send Emily a training requirement before generating a proposal.";
+        return;
+      }
+      status.textContent = "Searching OneDrive, researching the training topic with Google Search, and drafting…";
       button.disabled = true;
       try {
         const response = await fetch("/api/proposals", {
@@ -101,7 +140,13 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ session_id: sessionId })
         });
-        const data = await response.json();
+        const responseText = await response.text();
+        let data;
+        try {
+          data = JSON.parse(responseText);
+        } catch {
+          throw new Error("The server returned an unexpected response while generating the proposal.");
+        }
         if (!response.ok) throw new Error(data.detail || "The proposal could not be prepared.");
         const frame = document.getElementById("proposalFrame");
         frame.src = data.preview_url;

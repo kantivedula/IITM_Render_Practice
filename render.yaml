@@ -21,6 +21,8 @@ services:
         value: living-knowledge-emily
       - key: LIVING_KNOWLEDGE_WEBSITE
         value: https://www.livingknowledge.in
+      - key: GOOGLE_SEARCH_ENABLED
+        value: "true"
       - key: EMILY_DATABASE_PATH
         value: /var/data/emily.sqlite3
       - key: NGROK_ENABLED
