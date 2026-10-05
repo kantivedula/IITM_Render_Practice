@@ -39,6 +39,12 @@ Open <http://127.0.0.1:8000>. The API docs are at
 <http://127.0.0.1:8000/docs> and the health endpoint is
 <http://127.0.0.1:8000/health>.
 
+If a request fails on Render, the chat now displays the HTTP status and
+non-JSON server response rather than a JSON parsing exception. For HTTP 500,
+check the Render service's **Logs** at the matching timestamp; the application
+logs the full request traceback while returning a safe JSON error to the
+browser.
+
 The web chat asks for an enquiry, then **Generate proposal** searches supported
 documents under the configured OneDrive folder, selects relevant training
 content, performs Google Search grounding for the training topic, and drafts a

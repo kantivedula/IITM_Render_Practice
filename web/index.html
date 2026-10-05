@@ -65,6 +65,32 @@
       messages.scrollTop = messages.scrollHeight;
     }
 
+    async function readApiResponse(response, action) {
+      const body = await response.text();
+      let data;
+      try {
+        data = JSON.parse(body);
+      } catch {
+        const plainText = body
+          .replace(/<[^>]*>/g, " ")
+          .replace(/\s+/g, " ")
+          .trim()
+          .slice(0, 240);
+        if (!response.ok) {
+          const details = plainText ? `: ${plainText}` : "";
+          const hint = response.status >= 500
+            ? " Check the Render application logs for the traceback."
+            : "";
+          throw new Error(`${action} failed (HTTP ${response.status})${details}.${hint}`);
+        }
+        throw new Error(`${action} returned an unexpected non-JSON response.`);
+      }
+      if (!response.ok) {
+        throw new Error(data.detail || `${action} failed (HTTP ${response.status}).`);
+      }
+      return data;
+    }
+
     function addGroundedDetails(citations, suggestionsHtml) {
       if (citations && citations.length) {
         const list = document.createElement("div");
@@ -109,8 +135,7 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ message, session_id: sessionId || null })
         });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.detail || "The message could not be sent.");
+        const data = await readApiResponse(response, "Sending your message");
         sessionId = data.session_id;
         localStorage.setItem("emily-session-id", sessionId);
         addMessage(data.reply, "assistant");
@@ -140,14 +165,7 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ session_id: sessionId })
         });
-        const responseText = await response.text();
-        let data;
-        try {
-          data = JSON.parse(responseText);
-        } catch {
-          throw new Error("The server returned an unexpected response while generating the proposal.");
-        }
-        if (!response.ok) throw new Error(data.detail || "The proposal could not be prepared.");
+        const data = await readApiResponse(response, "Generating the proposal");
         const frame = document.getElementById("proposalFrame");
         frame.src = data.preview_url;
         frame.style.display = "block";
