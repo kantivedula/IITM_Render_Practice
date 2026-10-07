@@ -7,55 +7,157 @@
   <style>
     :root { color-scheme: light; font: 16px/1.5 system-ui, sans-serif; color: #20312d; background: #f2f6f4; }
     * { box-sizing: border-box; }
-    body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; }
-    .app { width: min(780px, 100%); background: white; border-radius: 16px; box-shadow: 0 12px 40px #18392d18; overflow: hidden; }
+    body { margin: 0; min-height: 100vh; padding: 24px; }
+    .app { width: min(900px, 100%); margin: 0 auto; background: white; border-radius: 16px; box-shadow: 0 12px 40px #18392d18; overflow: hidden; }
     header { background: #17594c; color: white; padding: 22px 26px; }
     header h1 { margin: 0; font-size: 1.35rem; }
     header p { margin: 4px 0 0; opacity: .85; }
-    #messages { height: min(60vh, 560px); overflow-y: auto; padding: 22px; }
+    main { padding: 24px; }
+    h2 { color: #17594c; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    label { display: block; font-weight: 600; margin: 0 0 6px; }
+    select, textarea, input { width: 100%; padding: 11px; border: 1px solid #cbd8d1; border-radius: 8px; font: inherit; background: white; }
+    textarea { min-height: 100px; resize: vertical; }
+    .field { margin-bottom: 16px; }
+    button { border: 0; background: #176d59; color: white; border-radius: 8px; padding: 11px 16px; font: inherit; cursor: pointer; }
+    button.secondary { background: #526c63; }
+    button:disabled { opacity: .55; cursor: wait; }
+    .hint, .privacy { color: #63736c; font-size: .88rem; }
+    .error { color: #9a2828; padding: 0; }
+    #messages { max-height: 340px; overflow-y: auto; padding: 8px 0; }
     .message { max-width: 85%; padding: 11px 14px; margin: 10px 0; border-radius: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
     .assistant { background: #edf5f1; }
     .user { background: #17594c; color: white; margin-left: auto; }
     .citations { max-width: 85%; margin: -4px 0 12px 10px; font-size: .84rem; }
     .citations a { color: #17594c; }
     .suggestions { display: block; width: min(600px, 100%); height: 120px; border: 0; margin: 4px 0 16px; }
-    .error { color: #9a2828; padding: 0 22px; }
-    form { border-top: 1px solid #e3eae6; padding: 16px; display: flex; gap: 10px; }
-    input { min-width: 0; flex: 1; padding: 12px; border: 1px solid #cbd8d1; border-radius: 8px; font: inherit; }
-    button { border: 0; background: #176d59; color: white; border-radius: 8px; padding: 11px 16px; font: inherit; cursor: pointer; }
-    button:disabled { opacity: .55; cursor: wait; }
-    .actions { display: flex; align-items: center; gap: 12px; padding: 0 22px 18px; flex-wrap: wrap; }
-    #proposalFrame { display: none; border: 1px solid #d8e2dc; width: 100%; height: 75vh; }
-    .privacy { color: #63736c; font-size: .8rem; padding: 0 22px 14px; }
-    @media(max-width:520px) { body { padding: 0; } .app { min-height: 100vh; border-radius: 0; } #messages { height: 60vh; } }
+    .chat-form { display: flex; gap: 10px; }
+    .chat-form input { flex: 1; min-width: 0; }
+    #proposalSection { display: none; margin-top: 32px; border-top: 1px solid #e3eae6; padding-top: 20px; }
+    #proposalFrame { width: 100%; min-height: 760px; border: 1px solid #d8e2dc; border-radius: 8px; }
+    .proposal-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 16px; }
+    #refinementBox { margin-top: 12px; }
+    @media(max-width:600px) {
+      body { padding: 0; }
+      .app { min-height: 100vh; border-radius: 0; }
+      main { padding: 18px; }
+      .grid { grid-template-columns: 1fr; gap: 0; }
+      #proposalFrame { min-height: 680px; }
+    }
   </style>
 </head>
 <body>
-  <main class="app">
+  <div class="app">
     <header>
       <h1>Emily | Living Knowledge</h1>
       <p>Your assistant for learning and training enquiries</p>
     </header>
-    <section id="messages" aria-live="polite">
-      <div class="message assistant">Hello! I'm Emily. What name should I use, and how can I help with your training requirement?</div>
-    </section>
-    <p class="error" id="error" role="alert"></p>
-    <form id="chatForm">
-      <input id="message" maxlength="8000" autocomplete="off" placeholder="Write your message…" aria-label="Your message" required>
-      <button id="send" type="submit">Send</button>
-    </form>
-    <div class="actions">
-      <button id="makeProposal" type="button">Generate proposal</button>
-      <span id="proposalStatus" role="status"></span>
-    </div>
-    <p class="privacy">Please share only information needed to discuss your training enquiry. This prototype stores conversation details locally in its SQLite database.</p>
-    <iframe id="proposalFrame" title="Proposal preview"></iframe>
-  </main>
+    <main>
+      <section aria-labelledby="requestHeading">
+        <h2 id="requestHeading">Tell us about your program</h2>
+        <p class="hint">Choose the closest options. Add any context that will help Emily shape a useful program outline.</p>
+        <form id="proposalForm">
+          <div class="grid">
+            <div class="field">
+              <label for="trainingCategory">Training category</label>
+              <select id="trainingCategory" required>
+                <option value="">Select a category</option>
+                <option>Leadership Development</option>
+                <option>Managerial Development</option>
+                <option>Sales Capability Development</option>
+                <option>Technical Training</option>
+                <option>Experiential Training (Outbound)</option>
+                <option>Others</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="interventionType">Type of intervention</label>
+              <select id="interventionType" required>
+                <option value="">Select an intervention</option>
+                <option>Stand-alone program</option>
+                <option>Journey-Based Intervention</option>
+                <option>Assessments</option>
+                <option>Not yet Decided</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="deliveryChoice">Delivery choice</label>
+              <select id="deliveryChoice" required>
+                <option value="">Select a delivery choice</option>
+                <option>Classroom</option>
+                <option>Virtual</option>
+                <option>Hybrid</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="participantCount">Number of participants</label>
+              <select id="participantCount" required>
+                <option value="">Select a group size</option>
+                <option>0-10</option>
+                <option>10-25</option>
+                <option>25-50</option>
+                <option>&gt;50</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="participantLevel">Participant level in the organisation</label>
+              <select id="participantLevel" required>
+                <option value="">Select a participant level</option>
+                <option>Board / C-suite</option>
+                <option>Senior leadership</option>
+                <option>Middle management</option>
+                <option>First-time managers</option>
+                <option>Individual contributors</option>
+                <option>Mixed levels</option>
+                <option>Other / not sure</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label for="otherInformation">Other useful information <span class="hint">(optional)</span></label>
+            <textarea id="otherInformation" maxlength="3000" placeholder="What should the program help participants do? Add relevant context, constraints, or preferences."></textarea>
+          </div>
+          <button id="createOutline" type="submit">Build program outline</button>
+          <span id="proposalStatus" role="status"></span>
+        </form>
+        <p class="privacy">Emily uses your program details to propose an initial outline. Do not enter confidential or sensitive personal information.</p>
+      </section>
+
+      <section aria-labelledby="chatHeading">
+        <h2 id="chatHeading">Ask Emily</h2>
+        <div id="messages" aria-live="polite">
+          <div class="message assistant">Hello! I'm Emily. What name should I use, and how can I help with your training requirement?</div>
+        </div>
+        <p class="error" id="error" role="alert"></p>
+        <form id="chatForm" class="chat-form">
+          <input id="message" maxlength="8000" autocomplete="off" placeholder="Ask a training-related question…" aria-label="Your message" required>
+          <button id="send" type="submit">Send</button>
+        </form>
+      </section>
+
+      <section id="proposalSection" aria-labelledby="outlineHeading">
+        <h2 id="outlineHeading">Review your program outline</h2>
+        <iframe id="proposalFrame" title="Program outline preview"></iframe>
+        <div class="proposal-actions">
+          <button id="approveOutline" type="button">Approve outline</button>
+          <a id="downloadPdf" hidden>Download approved PDF</a>
+          <span id="approvalStatus" role="status"></span>
+        </div>
+        <div id="refinementBox" class="field">
+          <label for="refinements">What would you like to change? (optional)</label>
+          <textarea id="refinements" maxlength="3000" placeholder="For example: add a module on coaching conversations, make the program more practical, or adapt it for senior leaders."></textarea>
+          <div class="proposal-actions">
+            <button id="regenerateOutline" class="secondary" type="button">Regenerate with these changes</button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
   <script>
     let sessionId = localStorage.getItem("emily-session-id") || "";
+    let proposalId = "";
     const messages = document.getElementById("messages");
     const error = document.getElementById("error");
-    const messageInput = document.getElementById("message");
 
     function addMessage(text, who) {
       const item = document.createElement("div");
@@ -71,23 +173,15 @@
       try {
         data = JSON.parse(body);
       } catch {
-        const plainText = body
-          .replace(/<[^>]*>/g, " ")
-          .replace(/\s+/g, " ")
-          .trim()
-          .slice(0, 240);
+        const excerpt = body.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 240);
         if (!response.ok) {
-          const details = plainText ? `: ${plainText}` : "";
-          const hint = response.status >= 500
-            ? " Check the Render application logs for the traceback."
-            : "";
-          throw new Error(`${action} failed (HTTP ${response.status})${details}.${hint}`);
+          const detail = excerpt ? `: ${excerpt}` : "";
+          const hint = response.status >= 500 ? " Check the Render application logs." : "";
+          throw new Error(`${action} failed (HTTP ${response.status})${detail}.${hint}`);
         }
         throw new Error(`${action} returned an unexpected non-JSON response.`);
       }
-      if (!response.ok) {
-        throw new Error(data.detail || `${action} failed (HTTP ${response.status}).`);
-      }
+      if (!response.ok) throw new Error(data.detail || `${action} failed (HTTP ${response.status}).`);
       return data;
     }
 
@@ -95,9 +189,7 @@
       if (citations && citations.length) {
         const list = document.createElement("div");
         list.className = "citations";
-        const label = document.createElement("span");
-        label.textContent = "Sources: ";
-        list.appendChild(label);
+        list.append("Sources: ");
         citations.forEach((citation, index) => {
           if (index) list.append(" · ");
           const link = document.createElement("a");
@@ -121,13 +213,114 @@
       messages.scrollTop = messages.scrollHeight;
     }
 
+    function showOutline(data) {
+      proposalId = data.proposal_id;
+      sessionId = data.session_id;
+      localStorage.setItem("emily-session-id", sessionId);
+      const section = document.getElementById("proposalSection");
+      const frame = document.getElementById("proposalFrame");
+      frame.src = `${data.preview_url}&_=${Date.now()}`;
+      section.style.display = "block";
+      document.getElementById("approvalStatus").textContent = data.message;
+      document.getElementById("approveOutline").hidden = false;
+      document.getElementById("downloadPdf").hidden = true;
+      section.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    document.getElementById("proposalForm").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const button = document.getElementById("createOutline");
+      const status = document.getElementById("proposalStatus");
+      error.textContent = "";
+      status.textContent = "Designing your program outline…";
+      button.disabled = true;
+      try {
+        const response = await fetch("/api/proposals", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            session_id: sessionId || null,
+            training_category: document.getElementById("trainingCategory").value,
+            intervention_type: document.getElementById("interventionType").value,
+            delivery_choice: document.getElementById("deliveryChoice").value,
+            participant_count_band: document.getElementById("participantCount").value,
+            participant_level: document.getElementById("participantLevel").value,
+            other_information: document.getElementById("otherInformation").value
+          })
+        });
+        const data = await readApiResponse(response, "Building the program outline");
+        showOutline(data);
+        status.textContent = "";
+      } catch (err) {
+        status.textContent = "";
+        error.textContent = err.message;
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    document.getElementById("regenerateOutline").addEventListener("click", async () => {
+      const refinements = document.getElementById("refinements").value.trim();
+      if (!refinements) {
+        error.textContent = "Add a refinement instruction before regenerating the outline.";
+        return;
+      }
+      const button = document.getElementById("regenerateOutline");
+      error.textContent = "";
+      document.getElementById("approvalStatus").textContent = "Updating your outline…";
+      button.disabled = true;
+      document.getElementById("approveOutline").hidden = true;
+      document.getElementById("downloadPdf").hidden = true;
+      try {
+        const response = await fetch(`/api/proposals/${proposalId}/regenerate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session_id: sessionId, refinements })
+        });
+        const data = await readApiResponse(response, "Regenerating the program outline");
+        showOutline(data);
+        document.getElementById("refinements").value = "";
+      } catch (err) {
+        error.textContent = err.message;
+        document.getElementById("approveOutline").hidden = false;
+        document.getElementById("approvalStatus").textContent =
+          "The prior outline is still available to review.";
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    document.getElementById("approveOutline").addEventListener("click", async () => {
+      const button = document.getElementById("approveOutline");
+      error.textContent = "";
+      button.disabled = true;
+      try {
+        const response = await fetch(`/api/proposals/${proposalId}/accept`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session_id: sessionId })
+        });
+        const data = await readApiResponse(response, "Approving the outline");
+        const download = document.getElementById("downloadPdf");
+        download.href = data.download_url;
+        download.setAttribute("download", "living-knowledge-program-outline.pdf");
+        download.hidden = false;
+        document.getElementById("approvalStatus").textContent = data.message;
+      } catch (err) {
+        error.textContent = err.message;
+      } finally {
+        button.disabled = false;
+      }
+    });
+
     document.getElementById("chatForm").addEventListener("submit", async (event) => {
       event.preventDefault();
-      const message = messageInput.value.trim();
+      const input = document.getElementById("message");
+      const message = input.value.trim();
       if (!message) return;
       error.textContent = "";
       addMessage(message, "user");
-      messageInput.value = "";
+      input.value = "";
       document.getElementById("send").disabled = true;
       try {
         const response = await fetch("/api/chat", {
@@ -144,37 +337,7 @@
         error.textContent = err.message;
       } finally {
         document.getElementById("send").disabled = false;
-        messageInput.focus();
-      }
-    });
-
-    document.getElementById("makeProposal").addEventListener("click", async () => {
-      const status = document.getElementById("proposalStatus");
-      const button = document.getElementById("makeProposal");
-      error.textContent = "";
-      if (!sessionId) {
-        status.textContent = "";
-        error.textContent = "Send Emily a training requirement before generating a proposal.";
-        return;
-      }
-      status.textContent = "Searching OneDrive, researching the training topic with Google Search, and drafting…";
-      button.disabled = true;
-      try {
-        const response = await fetch("/api/proposals", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ session_id: sessionId })
-        });
-        const data = await readApiResponse(response, "Generating the proposal");
-        const frame = document.getElementById("proposalFrame");
-        frame.src = data.preview_url;
-        frame.style.display = "block";
-        status.textContent = data.message;
-      } catch (err) {
-        status.textContent = "";
-        error.textContent = err.message;
-      } finally {
-        button.disabled = false;
+        input.focus();
       }
     });
   </script>
